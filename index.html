@@ -10,11 +10,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-
     <style>
         :root {
             --primary: #0B4D8D;
@@ -138,7 +133,6 @@
             .no-print { display: none !important; }
             header, #navMenu, .loading, #loginScreen { display: none; }
         }
-        .error-msg { color: var(--danger); margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -153,30 +147,14 @@
     <p><strong>Unified Multi-School Management System</strong></p>
     <p style="margin:20px 0; color:#555;">Offline-Capable • Multi-School • Secure</p>
 
-    <input type="email" id="email" placeholder="Email (e.g. admin@usms.rw)" required>
-    <input type="password" id="password" placeholder="Password" required>
-    <div id="authError" class="error-msg hidden"></div>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
 
     <button class="btn-primary" style="width:100%; padding:14px; margin-top:20px;" onclick="login()">Login</button>
-    <button class="btn-success" style="width:100%; padding:14px; margin-top:10px;" onclick="showRegister()">Create New Account</button>
 
     <div class="security-tips">
-        <strong>First Time?</strong> Click "Create New Account" to register the first admin.
-    </div>
-</div>
-
-<!-- Register Modal -->
-<div id="registerModal" class="modal hidden">
-    <div class="modal-content">
-        <h3>Create Account</h3>
-        <input type="email" id="regEmail" placeholder="Email">
-        <input type="password" id="regPassword" placeholder="Password">
-        <input type="password" id="regConfirm" placeholder="Confirm Password">
-        <div id="regError" class="error-msg hidden"></div>
-        <div style="text-align:right; margin-top:20px;">
-            <button class="btn-success" onclick="register()">Register</button>
-            <button class="btn-danger" onclick="closeModal('registerModal')">Cancel</button>
-        </div>
+        <strong>Security Note:</strong>
+        <p>Contact the system administrator for your credentials.</p>
     </div>
 </div>
 
@@ -400,7 +378,7 @@
         <form id="addStaffForm">
             <label>Code</label><input type="text" id="staffRegNo" required>
             <label>Name</label><input type="text" id="staffName" required>
-            <label>Email</label><input type="email" id="staffEmail" required>
+            <label>Username</label><input type="text" id="staffUsername" required>
             <label>Password</label><input type="password" id="staffPassword" required>
             <label>Gender</label><select id="staffGender" required><option value="">Select</option><option value="M">Male</option><option value="F">Female</option></select>
             <label>Role</label><input type="text" id="staffRole" required>
@@ -452,12 +430,27 @@
     </div>
 </div>
 
+<div id="registerModal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Register New User</h3>
+        <input type="text" id="regUsername" placeholder="Username">
+        <input type="password" id="regPassword" placeholder="Password">
+        <input type="password" id="regConfirm" placeholder="Confirm Password">
+        <div style="text-align:right; margin-top:20px;">
+            <button class="btn-success" onclick="register()">Register</button>
+            <button class="btn-danger" onclick="closeModal('registerModal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <div id="resetModal" class="modal hidden">
     <div class="modal-content">
         <h3>Reset Password</h3>
-        <input type="email" id="resetEmail" placeholder="User's Email">
+        <input type="text" id="resetUsername" placeholder="Username">
+        <input type="password" id="resetPassword" placeholder="New Password">
+        <input type="password" id="resetConfirm" placeholder="Confirm New Password">
         <div style="text-align:right; margin-top:20px;">
-            <button class="btn-success" onclick="resetPassword()">Send Reset Email</button>
+            <button class="btn-success" onclick="resetPassword()">Reset</button>
             <button class="btn-danger" onclick="closeModal('resetModal')">Cancel</button>
         </div>
     </div>
@@ -478,54 +471,42 @@
 </div>
 
 <script>
-  // ===== REPLACE WITH YOUR OWN FIREBASE CONFIG =====
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-
-  let currentUser = null;
-  let currentUserName = '';
-  let currentSchoolId = localStorage.getItem('usms_current_school') || null;
-  let schools = JSON.parse(localStorage.getItem('usms_schools') || JSON.stringify([{
+let currentSchoolId = localStorage.getItem('usms_current_school') || null;
+let schools = JSON.parse(localStorage.getItem('usms_schools') || JSON.stringify([{
     id: "demo2025", name: "GS Demo Rwanda 2025", schoolCode: "DEMO001", province: "Kigali", district: "Gasabo", sector: "Remera", headTeacherRegNo: null
-  }]));
-  const defaultFees = {1: {}, 2: {}, 3: {}};
-  let currentYear = '2025-2026';
-  let currentTerm = 1;
-  let learners = [], staff = [], payments = [], classes = [], feesStructure = defaultFees, feeReasons = [];
-  let globalStaff = JSON.parse(localStorage.getItem('usms_staff') || '[]');
-  let currentChart = null;
+}]));
+const defaultFees = {1: {}, 2: {}, 3: {}};
+let currentYear = '2025-2026';
+let currentTerm = 1;
+let learners = [], staff = [], payments = [], classes = [], feesStructure = defaultFees, feeReasons = [];
+let globalStaff = JSON.parse(localStorage.getItem('usms_staff') || '[]');
+let currentChart = null;
+let currentUser = null;
 
-  function isAdmin() {
-    return currentUserName === 'admin';
-  }
-  function isBursar() {
-    return currentUserName === 'finance';
-  }
-  function isHeadTeacher() {
+function isAdmin() {
+    return currentUser === 'admin';
+}
+function isBursar() {
+    return currentUser === 'finance';
+}
+function isHeadTeacher() {
     const school = getCurrentSchool();
     if (!school) return false;
     const head = staff.find(s => s.regNo === school.headTeacherRegNo);
-    return head && head.username === currentUserName;
-  }
-  function isAuthorized() {
+    return head && head.username === currentUser;
+}
+function isAuthorized() {
     return isAdmin() || isHeadTeacher() || isBursar();
-  }
+}
 
-  function configureUI() {
+function configureUI() {
+    // Only admin can add schools, assign head teachers, register/reset users
     document.getElementById('addSchoolBtn').style.display = isAdmin() ? '' : 'none';
     document.getElementById('assignHeadBtn').style.display = isAdmin() ? '' : 'none';
     document.getElementById('registerBtn').style.display = isAdmin() ? '' : 'none';
     document.getElementById('resetBtn').style.display = isAdmin() ? '' : 'none';
 
+    // All other features visible to Head Teacher and Bursar
     document.getElementById('staffTabBtn').style.display = '';
     document.getElementById('classesTabBtn').style.display = '';
     document.getElementById('feesTabBtn').style.display = '';
@@ -534,126 +515,86 @@
     document.getElementById('importLearnersBtn').style.display = '';
     document.getElementById('manageReasonsBtn').style.display = '';
     document.getElementById('editFeesBtn').style.display = '';
-  }
+}
 
-  function login() {
-    const email = document.getElementById('email').value.trim();
+function login() {
+    const username = document.getElementById('username').value.trim().toLowerCase();
     const password = document.getElementById('password').value;
-    if (!email || !password) return showError('authError', 'Please enter email and password');
+    let users = JSON.parse(localStorage.getItem('usms_users') || '{}');
 
-    auth.signInWithEmailAndPassword(email, password)
-      .then((userCredential) => {
-        currentUser = userCredential.user;
-        currentUserName = email.split('@')[0].toLowerCase();
-        document.getElementById('currentUser').textContent = currentUserName.charAt(0).toUpperCase() + currentUserName.slice(1);
+    if (Object.keys(users).length === 0) {
+        users['admin'] = 'admin123';
+        localStorage.setItem('usms_users', JSON.stringify(users));
+    }
+
+    if (users[username] && users[username] === password) {
+        currentUser = username;
+        document.getElementById('currentUser').textContent = username.charAt(0).toUpperCase() + username.slice(1);
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
         populateSchoolSelector();
         if (currentSchoolId) switchSchool(currentSchoolId);
         else if (schools.length > 0) {
-          const allowed = schools.filter(s => globalStaff.some(st => st.username === currentUserName && st.schoolId === s.id));
-          if (allowed.length > 0) switchSchool(allowed[0].id);
+            const allowed = schools.filter(s => globalStaff.some(st => st.username === currentUser && st.schoolId === s.id));
+            if (allowed.length > 0) switchSchool(allowed[0].id);
         }
         setTimeout(() => document.getElementById('loadingScreen').classList.add('hidden'), 800);
-        configureUI();
-        renderAll();
-      })
-      .catch((error) => {
-        showError('authError', error.message);
-      });
-  }
+    } else {
+        alert('Invalid credentials! Contact administrator.');
+    }
+}
 
-  function showRegister() {
+function showRegisterModal() {
+    if (!isAdmin()) return alert('Only admin can register users');
     document.getElementById('registerModal').classList.remove('hidden');
-  }
-
-  function register() {
-    const email = document.getElementById('regEmail').value.trim();
+}
+function register() {
+    const username = document.getElementById('regUsername').value.trim().toLowerCase();
     const password = document.getElementById('regPassword').value;
     const confirm = document.getElementById('regConfirm').value;
-    if (password !== confirm) return showError('regError', 'Passwords do not match');
-    if (password.length < 6) return showError('regError', 'Password must be at least 6 characters');
+    if (password !== confirm) return alert('Passwords do not match');
+    let users = JSON.parse(localStorage.getItem('usms_users') || '{}');
+    if (users[username]) return alert('User already exists');
+    users[username] = password;
+    localStorage.setItem('usms_users', JSON.stringify(users));
+    alert('Registered successfully!');
+    closeModal('registerModal');
+}
 
-    auth.createUserWithEmailAndPassword(email, password)
-      .then(() => {
-        alert('Account created successfully! You can now login.');
-        closeModal('registerModal');
-      })
-      .catch((error) => {
-        showError('regError', error.message);
-      });
-  }
-
-  function showRegisterModal() {
-    if (!isAdmin()) return alert('Only admin can register users');
-    showRegister();
-  }
-
-  function showResetModal() {
+function showResetModal() {
     if (!isAdmin()) return alert('Only admin can reset passwords');
     document.getElementById('resetModal').classList.remove('hidden');
-  }
+}
+function resetPassword() {
+    const username = document.getElementById('resetUsername').value.trim().toLowerCase();
+    const password = document.getElementById('resetPassword').value;
+    const confirm = document.getElementById('resetConfirm').value;
+    if (password !== confirm) return alert('Passwords do not match');
+    let users = JSON.parse(localStorage.getItem('usms_users') || '{}');
+    if (!users[username]) return alert('User not found');
+    users[username] = password;
+    localStorage.setItem('usms_users', JSON.stringify(users));
+    alert('Password reset successfully!');
+    closeModal('resetModal');
+}
 
-  function resetPassword() {
-    const email = document.getElementById('resetEmail').value.trim();
-    if (!email) return alert('Enter email');
-    auth.sendPasswordResetEmail(email)
-      .then(() => {
-        alert('Password reset email sent!');
-        closeModal('resetModal');
-      })
-      .catch((error) => {
-        alert(error.message);
-      });
-  }
+function logout() {
+    currentUser = null;
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+}
 
-  function logout() {
-    auth.signOut().then(() => {
-      currentUser = null;
-      currentUserName = '';
-      document.getElementById('app').classList.add('hidden');
-      document.getElementById('loginScreen').classList.remove('hidden');
-      document.getElementById('email').value = '';
-      document.getElementById('password').value = '';
-    });
-  }
-
-  function showError(id, msg) {
-    const el = document.getElementById(id);
-    el.textContent = msg;
-    el.classList.remove('hidden');
-  }
-
-  // Listen for auth state changes
-  auth.onAuthStateChanged((user) => {
-    if (user) {
-      currentUser = user;
-      currentUserName = user.email.split('@')[0].toLowerCase();
-      document.getElementById('currentUser').textContent = currentUserName.charAt(0).toUpperCase() + currentUserName.slice(1);
-      document.getElementById('loginScreen').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      populateSchoolSelector();
-      if (currentSchoolId) switchSchool(currentSchoolId);
-      configureUI();
-      renderAll();
-    } else {
-      currentUser = null;
-      currentUserName = '';
-      document.getElementById('app').classList.add('hidden');
-      document.getElementById('loginScreen').classList.remove('hidden');
-    }
-    setTimeout(() => document.getElementById('loadingScreen').classList.add('hidden'), 1000);
-  });
-
-  function getCurrentSchool() {
+function getCurrentSchool() {
     return schools.find(s => s.id === currentSchoolId);
-  }
+}
 
-  function getKey(key) {
-    return currentSchoolId ? `usms_\( {currentSchoolId}_ \){currentYear}_${key}` : null;
-  }
+function getKey(key) {
+    return currentSchoolId ? `usms_${currentSchoolId}_${currentYear}_${key}` : null;
+}
 
-  function loadSchoolData() {
+function loadSchoolData() {
     if (!currentSchoolId) return;
     learners = JSON.parse(localStorage.getItem(getKey('learners')) || '[]');
     payments = JSON.parse(localStorage.getItem(getKey('payments')) || '[]');
@@ -661,9 +602,9 @@
     feesStructure = JSON.parse(localStorage.getItem(getKey('fees')) || JSON.stringify(defaultFees));
     feeReasons = JSON.parse(localStorage.getItem(getKey('feeReasons')) || '[]');
     currentTerm = parseInt(localStorage.getItem(getKey('term')) || '1');
-  }
+}
 
-  function saveSchoolData() {
+function saveSchoolData() {
     if (!currentSchoolId) return;
     localStorage.setItem(getKey('learners'), JSON.stringify(learners));
     localStorage.setItem(getKey('payments'), JSON.stringify(payments));
@@ -672,41 +613,41 @@
     localStorage.setItem(getKey('feeReasons'), JSON.stringify(feeReasons));
     localStorage.setItem(getKey('term'), currentTerm.toString());
     saveGlobalStaff();
-  }
+}
 
-  function saveGlobalStaff() {
+function saveGlobalStaff() {
     globalStaff = globalStaff.filter(s => s.schoolId !== currentSchoolId).concat(staff);
     localStorage.setItem('usms_staff', JSON.stringify(globalStaff));
-  }
+}
 
-  function populateSchoolSelector() {
+function populateSchoolSelector() {
     const select = document.getElementById('schoolSelector');
     select.innerHTML = '<option value="">Select School</option>';
     let availableSchools = schools;
 
     if (!isAdmin()) {
-      availableSchools = schools.filter(school =>
-        globalStaff.some(st => st.username === currentUserName && st.schoolId === school.id)
-      );
+        availableSchools = schools.filter(school =>
+            globalStaff.some(st => st.username === currentUser && st.schoolId === school.id)
+        );
     }
 
     availableSchools.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = `\( {s.name} ( \){s.schoolCode})`;
-      if (s.id === currentSchoolId) opt.selected = true;
-      select.appendChild(opt);
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `${s.name} (${s.schoolCode})`;
+        if (s.id === currentSchoolId) opt.selected = true;
+        select.appendChild(opt);
     });
 
     if (availableSchools.length === 0 && !isAdmin()) {
-      alert('No schools assigned to your account. Contact the administrator.');
-      select.disabled = true;
+        alert('No schools assigned to your account. Contact the administrator.');
+        select.disabled = true;
     } else {
-      select.disabled = false;
+        select.disabled = false;
     }
-  }
+}
 
-  function switchSchool(id) {
+function switchSchool(id) {
     if (!id) return;
     currentSchoolId = id;
     localStorage.setItem('usms_current_school', id);
@@ -714,16 +655,16 @@
     document.getElementById('schoolName').textContent = school.name;
     const headTeacher = staff.find(s => s.regNo === school.headTeacherRegNo);
     document.getElementById('schoolLocation').textContent = headTeacher
-      ? `\( {school.province} • \){school.district} • \( {school.sector} • Head Teacher: \){headTeacher.name}`
-      : `\( {school.province} • \){school.district} • ${school.sector}`;
+        ? `${school.province} • ${school.district} • ${school.sector} • Head Teacher: ${headTeacher.name}`
+        : `${school.province} • ${school.district} • ${school.sector}`;
     loadSchoolData();
     staff = globalStaff.filter(s => s.schoolId === currentSchoolId);
     updateDisplays();
     renderAll();
     configureUI();
-  }
+}
 
-  function showAssignHeadTeacherModal() {
+function showAssignHeadTeacherModal() {
     if (!isAdmin()) return alert('Only admin can assign head teacher');
     const school = getCurrentSchool();
     if (!school) return alert("Please select a school first.");
@@ -731,16 +672,16 @@
     const select = document.getElementById('headTeacherSelect');
     select.innerHTML = '<option value="">-- No Head Teacher --</option>';
     staff.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.regNo;
-      opt.textContent = `\( {s.name} ( \){s.regNo}) - ${s.role}`;
-      if (s.regNo === school.headTeacherRegNo) opt.selected = true;
-      select.appendChild(opt);
+        const opt = document.createElement('option');
+        opt.value = s.regNo;
+        opt.textContent = `${s.name} (${s.regNo}) - ${s.role}`;
+        if (s.regNo === school.headTeacherRegNo) opt.selected = true;
+        select.appendChild(opt);
     });
     document.getElementById('assignHeadTeacherModal').classList.remove('hidden');
-  }
+}
 
-  function assignHeadTeacher() {
+function assignHeadTeacher() {
     const regNo = document.getElementById('headTeacherSelect').value;
     const school = getCurrentSchool();
     school.headTeacherRegNo = regNo || null;
@@ -748,45 +689,45 @@
     alert(regNo ? "Head Teacher assigned!" : "Head Teacher removed.");
     closeModal('assignHeadTeacherModal');
     switchSchool(currentSchoolId);
-  }
+}
 
-  function updateDisplays() {
+function updateDisplays() {
     document.getElementById('dashYear').textContent = currentYear;
     document.getElementById('yearSelector').value = currentYear;
     document.getElementById('dashTerm').textContent = currentTerm;
     document.getElementById('termSelector').value = currentTerm;
     document.getElementById('feesTermDisplay').textContent = currentTerm;
     document.getElementById('feesModalTerm').textContent = currentTerm;
-  }
+}
 
-  function showTab(id) {
+function showTab(id) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('#navMenu button').forEach(b => b.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     document.querySelector(`#navMenu button[onclick="showTab('${id}')"]`).classList.add('active');
     if (id === 'financeTab') renderFinanceChart();
-  }
+}
 
-  function changeYear(y) {
+function changeYear(y) {
     currentYear = y;
     loadSchoolData();
     staff = globalStaff.filter(s => s.schoolId === currentSchoolId);
     updateDisplays();
     renderAll();
-  }
+}
 
-  function changeTerm(t) {
+function changeTerm(t) {
     currentTerm = parseInt(t);
     saveSchoolData();
     updateDisplays();
     renderAll();
-  }
+}
 
-  function closeModal(id) {
+function closeModal(id) {
     document.getElementById(id).classList.add('hidden');
-  }
+}
 
-  function getDefaultFee(className) {
+function getDefaultFee(className) {
     if (!className) return 0;
     const lc = className.toLowerCase();
     if (lc.includes('nursery')) return 35000;
@@ -795,22 +736,22 @@
     if (/s[1-3]/i.test(lc)) return 80000;
     if (/s[4-6]/i.test(lc)) return 100000;
     return 0;
-  }
+}
 
-  function getFeesDue(className) {
+function getFeesDue(className) {
     if (!className) return 0;
     const fees = feesStructure[currentTerm]?.[className] || {};
     const total = Object.values(fees).reduce((s, v) => s + v, 0);
     return total > 0 ? total : getDefaultFee(className);
-  }
+}
 
-  function getLearnerPayments(regNo) {
+function getLearnerPayments(regNo) {
     return payments.filter(p => p.regNo === regNo && p.term === currentTerm);
-  }
+}
 
-  function recordPayment(regNo, name) {
+function recordPayment(regNo, name) {
     if (!isAuthorized()) return alert('Not authorized');
-    const amountStr = prompt(`Record payment for \( {name} ( \){regNo})\nAmount (RWF):`);
+    const amountStr = prompt(`Record payment for ${name} (${regNo})\nAmount (RWF):`);
     if (!amountStr || isNaN(amountStr) || parseFloat(amountStr) <= 0) return;
     const amount = parseInt(amountStr);
     const reason = prompt('Reason:', 'School Fees') || 'School Fees';
@@ -818,55 +759,55 @@
     saveSchoolData();
     alert(`RWF ${amount.toLocaleString()} recorded!`);
     renderAll();
-  }
+}
 
-  function renderLearners() {
+function renderLearners() {
     const search = document.getElementById('learnerSearch').value.toLowerCase();
     const classFilter = document.getElementById('classFilter').value;
     const tbody = document.getElementById('learnerList');
     tbody.innerHTML = '';
     let filtered = learners.filter(l =>
-      (l.regNo.toLowerCase().includes(search) || l.name.toLowerCase().includes(search)) &&
-      (!classFilter || l.class === classFilter)
+        (l.regNo.toLowerCase().includes(search) || l.name.toLowerCase().includes(search)) &&
+        (!classFilter || l.class === classFilter)
     );
     filtered.sort((a,b) => a.regNo.localeCompare(b.regNo));
     if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:60px;color:#999;">No learners found</td></tr>';
-      return;
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:60px;color:#999;">No learners found</td></tr>';
+        return;
     }
     filtered.forEach(l => {
-      const due = getFeesDue(l.class);
-      const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
-      const balance = due - paid;
-      const status = paid >= due ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
-      const statusClass = `status-${status.toLowerCase()}`;
-      const count = getLearnerPayments(l.regNo).length;
-      let actions = '';
-      if (isAuthorized()) {
-        actions += `<button class="btn-sm btn-primary" onclick="editLearner('${l.regNo}')">Edit</button> `;
-        actions += `<button class="btn-sm btn-danger" onclick="deleteLearner('${l.regNo}')">Delete</button>`;
-        actions += `<button class="btn-sm btn-pay" onclick="recordPayment('\( {l.regNo}', ' \){l.name.replace(/'/g, "\\'")}')">Pay</button>`;
-      }
-      tbody.innerHTML += `
-        <tr>
-          <td><strong>${l.regNo}</strong></td>
-          <td>${l.name}</td>
-          <td>${l.fatherName || '—'}</td>
-          <td>${l.motherName || '—'}</td>
-          <td>${l.email || '—'}</td>
-          <td>${l.class || '—'}</td>
-          <td>${l.gender === 'M' ? 'Male' : 'Female'}</td>
-          <td>RWF ${due.toLocaleString()}</td>
-          <td>RWF ${paid.toLocaleString()}</td>
-          <td>RWF ${balance.toLocaleString()}</td>
-          <td><span class="status-badge \( {statusClass}"> \){status}</span></td>
-          <td><span class="payment-details" onclick="showPaymentHistory('\( {l.regNo}', ' \){l.name.replace(/'/g, "\\'")}')">View (${count})</span></td>
-          <td style="white-space:nowrap;">${actions}</td>
-        </tr>`;
+        const due = getFeesDue(l.class);
+        const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
+        const balance = due - paid;
+        const status = paid >= due ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
+        const statusClass = `status-${status.toLowerCase()}`;
+        const count = getLearnerPayments(l.regNo).length;
+        let actions = '';
+        if (isAuthorized()) {
+            actions += `<button class="btn-sm btn-primary" onclick="editLearner('${l.regNo}')">Edit</button> `;
+            actions += `<button class="btn-sm btn-danger" onclick="deleteLearner('${l.regNo}')">Delete</button>`;
+            actions += `<button class="btn-sm btn-pay" onclick="recordPayment('${l.regNo}', '${l.name.replace(/'/g, "\\'")}')">Pay</button>`;
+        }
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${l.regNo}</strong></td>
+                <td>${l.name}</td>
+                <td>${l.fatherName || '—'}</td>
+                <td>${l.motherName || '—'}</td>
+                <td>${l.email || '—'}</td>
+                <td>${l.class || '—'}</td>
+                <td>${l.gender === 'M' ? 'Male' : 'Female'}</td>
+                <td>RWF ${due.toLocaleString()}</td>
+                <td>RWF ${paid.toLocaleString()}</td>
+                <td>RWF ${balance.toLocaleString()}</td>
+                <td><span class="status-badge ${statusClass}">${status}</span></td>
+                <td><span class="payment-details" onclick="showPaymentHistory('${l.regNo}', '${l.name.replace(/'/g, "\\'")}')">View (${count})</span></td>
+                <td style="white-space:nowrap;">${actions}</td>
+            </tr>`;
     });
-  }
+}
 
-  function showPaymentHistory(regNo, name) {
+function showPaymentHistory(regNo, name) {
     document.getElementById('phName').textContent = name;
     document.getElementById('phRegNo').textContent = regNo;
     const tbody = document.getElementById('paymentHistoryTable');
@@ -874,12 +815,12 @@
     const pays = getLearnerPayments(regNo);
     if (pays.length === 0) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No payments recorded</td></tr>';
     pays.forEach(p => {
-      tbody.innerHTML += `<tr><td>\( {p.date}</td><td>RWF \){p.amount.toLocaleString()}</td><td>${p.reason}</td></tr>`;
+        tbody.innerHTML += `<tr><td>${p.date}</td><td>RWF ${p.amount.toLocaleString()}</td><td>${p.reason}</td></tr>`;
     });
     document.getElementById('paymentHistoryModal').classList.remove('hidden');
-  }
+}
 
-  function renderDashboard() {
+function renderDashboard() {
     const totalDue = learners.reduce((s, l) => s + getFeesDue(l.class), 0);
     const totalPaid = payments.filter(p => p.term === currentTerm).reduce((s, p) => s + p.amount, 0);
     const rate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0;
@@ -890,9 +831,9 @@
     document.getElementById('dashFeesCollected').textContent = 'RWF ' + totalPaid.toLocaleString();
     document.getElementById('dashFeesRate').textContent = rate + '%';
     document.getElementById('dashTotalClasses').textContent = classes.length;
-  }
+}
 
-  function renderFinanceChart() {
+function renderFinanceChart() {
     const totalDue = learners.reduce((s, l) => s + getFeesDue(l.class), 0);
     const totalPaid = payments.filter(p => p.term === currentTerm).reduce((s, p) => s + p.amount, 0);
     const outstanding = totalDue - totalPaid;
@@ -900,93 +841,93 @@
     document.getElementById('totalOutstanding').textContent = outstanding.toLocaleString();
     if (currentChart) currentChart.destroy();
     currentChart = new Chart(document.getElementById('feesChart'), {
-      type: 'doughnut',
-      data: { labels: ['Collected', 'Outstanding'], datasets: [{ data: [totalPaid, outstanding || 1], backgroundColor: ['#27ae60', '#e74c3c'] }] },
-      options: { responsive: true }
+        type: 'doughnut',
+        data: { labels: ['Collected', 'Outstanding'], datasets: [{ data: [totalPaid, outstanding || 1], backgroundColor: ['#27ae60', '#e74c3c'] }] },
+        options: { responsive: true }
     });
-  }
+}
 
-  function renderFeesSummary() {
+function renderFeesSummary() {
     const grid = document.getElementById('feesGrid');
     grid.innerHTML = '';
     classes.sort();
     classes.forEach(c => {
-      const fees = feesStructure[currentTerm]?.[c] || {};
-      const total = Object.values(fees).reduce((s, v) => s + v, 0) || getDefaultFee(c);
-      let html = '<div class="fees-group"><h4>' + c + '</h4><p>RWF <strong>' + total.toLocaleString() + '</strong></p>';
-      feeReasons.forEach(r => {
-        const amt = fees[r.name] || 0;
-        if (amt > 0) html += '<small>' + r.name + ': RWF ' + amt.toLocaleString() + '</small><br>';
-      });
-      html += '</div>';
-      grid.innerHTML += html;
+        const fees = feesStructure[currentTerm]?.[c] || {};
+        const total = Object.values(fees).reduce((s, v) => s + v, 0) || getDefaultFee(c);
+        let html = '<div class="fees-group"><h4>' + c + '</h4><p>RWF <strong>' + total.toLocaleString() + '</strong></p>';
+        feeReasons.forEach(r => {
+            const amt = fees[r.name] || 0;
+            if (amt > 0) html += '<small>' + r.name + ': RWF ' + amt.toLocaleString() + '</small><br>';
+        });
+        html += '</div>';
+        grid.innerHTML += html;
     });
     if (classes.length === 0) grid.innerHTML = '<p style="text-align:center;color:#999;">No classes defined</p>';
-  }
+}
 
-  function renderStaff() {
+function renderStaff() {
     const tbody = document.getElementById('staffList');
     tbody.innerHTML = staff.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:60px;color:#999;">No staff registered</td></tr>' : '';
     staff.forEach((s, i) => {
-      tbody.innerHTML += `<tr><td>\( {s.regNo}</td><td> \){s.name}</td><td>\( {s.username || '—'}</td><td> \){s.gender==='M'?'Male':'Female'}</td><td>${s.role}</td>
-        <td><button class="btn-sm btn-primary" onclick="editStaff(${i})">Edit</button>
-            <button class="btn-sm btn-danger" onclick="deleteStaff(${i})">Delete</button></td></tr>`;
+        tbody.innerHTML += `<tr><td>${s.regNo}</td><td>${s.name}</td><td>${s.username || '—'}</td><td>${s.gender==='M'?'Male':'Female'}</td><td>${s.role}</td>
+            <td><button class="btn-sm btn-primary" onclick="editStaff(${i})">Edit</button>
+                <button class="btn-sm btn-danger" onclick="deleteStaff(${i})">Delete</button></td></tr>`;
     });
-  }
+}
 
-  function renderClasses() {
+function renderClasses() {
     const tbody = document.getElementById('classList');
     tbody.innerHTML = '';
     if (classes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:80px;color:#999;font-size:18px;">No classes created yet.<br><br>Click "Add New Class" to begin.</td></tr>';
-      document.getElementById('totalClassesCount').textContent = '0';
-      return;
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:80px;color:#999;font-size:18px;">No classes created yet.<br><br>Click "Add New Class" to begin.</td></tr>';
+        document.getElementById('totalClassesCount').textContent = '0';
+        return;
     }
     classes.sort();
     classes.forEach(c => {
-      const count = learners.filter(l => l.class === c).length;
-      const plural = count !== 1 ? 's' : '';
-      tbody.innerHTML += `
-        <tr>
-          <td style="font-size:20px;font-weight:600;color:var(--primary);">${c}</td>
-          <td style="text-align:center;font-size:28px;font-weight:bold;color:${count > 0 ? 'var(--success)' : '#999'};">
-            ${count}
-            <div style="font-size:14px;color:#666;margin-top:5px;">learner${plural}</div>
-          </td>
-          <td class="class-actions">
-            <button class="btn-sm btn-primary" onclick="editClassName('${c}')"><i class="fas fa-edit"></i> Rename</button>
-            <button class="btn-sm btn-success" onclick="showLearnersListModal('all','${c}')"><i class="fas fa-users"></i> View</button>
-            <button class="btn-sm btn-danger" onclick="deleteClass('${c}')"><i class="fas fa-trash"></i> Delete</button>
-          </td>
-        </tr>`;
+        const count = learners.filter(l => l.class === c).length;
+        const plural = count !== 1 ? 's' : '';
+        tbody.innerHTML += `
+            <tr>
+                <td style="font-size:20px;font-weight:600;color:var(--primary);">${c}</td>
+                <td style="text-align:center;font-size:28px;font-weight:bold;color:${count > 0 ? 'var(--success)' : '#999'};">
+                    ${count}
+                    <div style="font-size:14px;color:#666;margin-top:5px;">learner${plural}</div>
+                </td>
+                <td class="class-actions">
+                    <button class="btn-sm btn-primary" onclick="editClassName('${c}')"><i class="fas fa-edit"></i> Rename</button>
+                    <button class="btn-sm btn-success" onclick="showLearnersListModal('all','${c}')"><i class="fas fa-users"></i> View</button>
+                    <button class="btn-sm btn-danger" onclick="deleteClass('${c}')"><i class="fas fa-trash"></i> Delete</button>
+                </td>
+            </tr>`;
     });
     document.getElementById('totalClassesCount').textContent = classes.length;
-  }
+}
 
-  function populateClassFilter() {
+function populateClassFilter() {
     const select = document.getElementById('classFilter');
     select.innerHTML = '<option value="">All Classes</option>';
     classes.sort();
-    classes.forEach(c => select.innerHTML += `<option value="\( {c}"> \){c}</option>`);
-  }
+    classes.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+}
 
-  function populateClassDropdown() {
+function populateClassDropdown() {
     const select = document.getElementById('learnerClass');
     select.innerHTML = '<option value="">Select Class</option>';
     classes.sort();
-    classes.forEach(c => select.innerHTML += `<option value="\( {c}"> \){c}</option>`);
-  }
+    classes.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+}
 
-  function showAddLearnerModal() {
+function showAddLearnerModal() {
     if (!isAuthorized()) return alert('Not authorized');
     document.getElementById('learnerModalTitle').textContent = 'Add Learner';
     document.getElementById('addLearnerForm').reset();
     delete document.getElementById('addLearnerForm').dataset.editIndex;
     populateClassDropdown();
     document.getElementById('addLearnerModal').classList.remove('hidden');
-  }
+}
 
-  function editLearner(regNo) {
+function editLearner(regNo) {
     if (!isAuthorized()) return alert('Not authorized');
     const l = learners.find(l => l.regNo === regNo);
     if (!l) return;
@@ -1001,19 +942,19 @@
     document.getElementById('learnerModalTitle').textContent = 'Edit Learner';
     populateClassDropdown();
     document.getElementById('addLearnerModal').classList.remove('hidden');
-  }
+}
 
-  function deleteLearner(regNo) {
+function deleteLearner(regNo) {
     if (!isAuthorized()) return alert('Not authorized');
     if (confirm('Delete this learner? All payments will also be deleted.')) {
-      learners = learners.filter(l => l.regNo !== regNo);
-      payments = payments.filter(p => p.regNo !== regNo);
-      saveSchoolData();
-      renderAll();
+        learners = learners.filter(l => l.regNo !== regNo);
+        payments = payments.filter(p => p.regNo !== regNo);
+        saveSchoolData();
+        renderAll();
     }
-  }
+}
 
-  document.getElementById('addLearnerForm').onsubmit = function(e) {
+document.getElementById('addLearnerForm').onsubmit = function(e) {
     e.preventDefault();
     const regNo = document.getElementById('learnerRegNo').value.trim().toUpperCase();
     const name = document.getElementById('learnerName').value.trim();
@@ -1025,96 +966,96 @@
     if (!regNo || !name || !gender || !cls) return alert('Required fields missing');
     const editIndex = this.dataset.editIndex;
     if (editIndex !== undefined) {
-      learners[editIndex] = {regNo, name, fatherName, motherName, email, gender, class: cls};
+        learners[editIndex] = {regNo, name, fatherName, motherName, email, gender, class: cls};
     } else {
-      if (learners.some(l => l.regNo === regNo)) return alert('SDMS Code already exists');
-      learners.push({regNo, name, fatherName, motherName, email, gender, class: cls});
+        if (learners.some(l => l.regNo === regNo)) return alert('SDMS Code already exists');
+        learners.push({regNo, name, fatherName, motherName, email, gender, class: cls});
     }
     saveSchoolData();
     closeModal('addLearnerModal');
     renderAll();
-  };
+};
 
-  function showLearnersListModal(filter = 'all', specificClass = '') {
+function showLearnersListModal(filter = 'all', specificClass = '') {
     const school = getCurrentSchool();
-    document.getElementById('learnersListTitle').textContent = specificClass ? `Learners in \( {specificClass}` : ` \){filter.charAt(0).toUpperCase() + filter.slice(1)} Learners - Term ${currentTerm}`;
+    document.getElementById('learnersListTitle').textContent = specificClass ? `Learners in ${specificClass}` : `${filter.charAt(0).toUpperCase() + filter.slice(1)} Learners - Term ${currentTerm}`;
     document.getElementById('learnersListSchool').textContent = school ? school.name : '';
     const tbody = document.getElementById('learnersListTable');
     tbody.innerHTML = '';
     let list = learners;
     if (specificClass) list = learners.filter(l => l.class === specificClass);
     else if (filter !== 'all') {
-      list = learners.filter(l => {
-        const due = getFeesDue(l.class);
-        const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
-        return filter === 'paid' ? paid >= due : filter === 'partial' ? paid > 0 && paid < due : paid === 0;
-      });
+        list = learners.filter(l => {
+            const due = getFeesDue(l.class);
+            const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
+            return filter === 'paid' ? paid >= due : filter === 'partial' ? paid > 0 && paid < due : paid === 0;
+        });
     }
     document.getElementById('totalLearnersCount').textContent = list.length;
     list.forEach((l, i) => {
-      const due = getFeesDue(l.class);
-      const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
-      const balance = due - paid;
-      const status = paid >= due ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
-      tbody.innerHTML += `<tr><td>\( {i+1}</td><td> \){l.regNo}</td><td>\( {l.name}</td><td> \){l.fatherName || '—'}</td><td>\( {l.motherName || '—'}</td><td> \){l.email || '—'}</td><td>\( {l.class}</td><td> \){l.gender==='M'?'Male':'Female'}</td>
-        <td>RWF \( {due.toLocaleString()}</td><td>RWF \){paid.toLocaleString()}</td><td>RWF \( {balance.toLocaleString()}</td><td> \){status}</td></tr>`;
+        const due = getFeesDue(l.class);
+        const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
+        const balance = due - paid;
+        const status = paid >= due ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
+        tbody.innerHTML += `<tr><td>${i+1}</td><td>${l.regNo}</td><td>${l.name}</td><td>${l.fatherName || '—'}</td><td>${l.motherName || '—'}</td><td>${l.email || '—'}</td><td>${l.class}</td><td>${l.gender==='M'?'Male':'Female'}</td>
+            <td>RWF ${due.toLocaleString()}</td><td>RWF ${paid.toLocaleString()}</td><td>RWF ${balance.toLocaleString()}</td><td>${status}</td></tr>`;
     });
     document.getElementById('learnersListModal').classList.remove('hidden');
-  }
+}
 
-  function exportLearners() {
+function exportLearners() {
     let csv = 'SDMS Code,Name,Father Name,Mother Name,Email,Class,Gender,Due,Paid,Balance,Status\n';
     learners.forEach(l => {
-      const due = getFeesDue(l.class);
-      const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
-      const status = paid >= due ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
-      csv += `\( {l.regNo}, \){l.name},\( {l.fatherName || ''}, \){l.motherName || ''},\( {l.email || ''}, \){l.class},\( {l.gender==='M'?'Male':'Female'}, \){due},\( {paid}, \){due-paid},${status}\n`;
+        const due = getFeesDue(l.class);
+        const paid = getLearnerPayments(l.regNo).reduce((s,p) => s + p.amount, 0);
+        const status = paid >= due ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
+        csv += `${l.regNo},${l.name},${l.fatherName || ''},${l.motherName || ''},${l.email || ''},${l.class},${l.gender==='M'?'Male':'Female'},${due},${paid},${due-paid},${status}\n`;
     });
     const blob = new Blob([csv], {type: 'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'learners.csv'; a.click();
-  }
+}
 
-  function downloadLearnerTemplate() {
+function downloadLearnerTemplate() {
     const csv = 'SDMS Code,Name,Father Name,Mother Name,Email,Gender,Class\nRW001,John Doe,Mr. John Senior,Mrs. Jane Doe,john@example.com,M,P1\n';
     const blob = new Blob([csv], {type: 'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'learner_template.csv'; a.click();
-  }
+}
 
-  function importLearners(event) {
+function importLearners(event) {
     if (!isAuthorized()) return alert('Not authorized');
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(e) {
-      const lines = e.target.result.split('\n');
-      let added = 0;
-      for (let i = 1; i < lines.length; i++) {
-        const parts = lines[i].trim().split(',');
-        if (parts.length < 7) continue;
-        const regNo = parts[0].trim().toUpperCase();
-        const name = parts[1].trim();
-        const fatherName = parts[2].trim();
-        const motherName = parts[3].trim();
-        const email = parts[4].trim();
-        const gender = parts[5].trim().toUpperCase();
-        const cls = parts[6].trim();
-        if (regNo && name && ['M','F'].includes(gender) && cls && !learners.find(l => l.regNo === regNo)) {
-          learners.push({regNo, name, fatherName, motherName, email, gender, class: cls});
-          added++;
+        const lines = e.target.result.split('\n');
+        let added = 0;
+        for (let i = 1; i < lines.length; i++) {
+            const parts = lines[i].trim().split(',');
+            if (parts.length < 7) continue;
+            const regNo = parts[0].trim().toUpperCase();
+            const name = parts[1].trim();
+            const fatherName = parts[2].trim();
+            const motherName = parts[3].trim();
+            const email = parts[4].trim();
+            const gender = parts[5].trim().toUpperCase();
+            const cls = parts[6].trim();
+            if (regNo && name && ['M','F'].includes(gender) && cls && !learners.find(l => l.regNo === regNo)) {
+                learners.push({regNo, name, fatherName, motherName, email, gender, class: cls});
+                added++;
+            }
         }
-      }
-      saveSchoolData();
-      alert(`Imported ${added} learners`);
-      renderAll();
+        saveSchoolData();
+        alert(`Imported ${added} learners`);
+        renderAll();
     };
     reader.readAsText(file);
-  }
+}
 
-  function addClass() {
+function addClass() {
     if (!isAuthorized()) return alert('Not authorized');
     const name = prompt('Enter new class name (e.g. P1, S4, Nursery):').trim().toUpperCase();
     if (!name) return;
@@ -1125,9 +1066,9 @@
     populateClassFilter();
     populateClassDropdown();
     renderFeesSummary();
-  }
+}
 
-  function editClassName(oldName) {
+function editClassName(oldName) {
     if (!isAuthorized()) return alert('Not authorized');
     const newName = prompt('New class name:', oldName).trim().toUpperCase();
     if (!newName || newName === oldName) return;
@@ -1136,52 +1077,52 @@
     classes[index] = newName;
     learners = learners.map(l => l.class === oldName ? {...l, class: newName} : l);
     for (let t = 1; t <= 3; t++) {
-      if (feesStructure[t] && feesStructure[t][oldName]) {
-        feesStructure[t][newName] = feesStructure[t][oldName];
-        delete feesStructure[t][oldName];
-      }
+        if (feesStructure[t] && feesStructure[t][oldName]) {
+            feesStructure[t][newName] = feesStructure[t][oldName];
+            delete feesStructure[t][oldName];
+        }
     }
     saveSchoolData();
     renderAll();
-  }
+}
 
-  function deleteClass(c) {
+function deleteClass(c) {
     if (!isAuthorized()) return alert('Not authorized');
     if (confirm(`Delete class ${c}? Learners will be unassigned.`)) {
-      classes = classes.filter(x => x !== c);
-      learners = learners.map(l => l.class === c ? {...l, class: ''} : l);
-      for (let t = 1; t <= 3; t++) {
-        if (feesStructure[t]) delete feesStructure[t][c];
-      }
-      saveSchoolData();
-      renderAll();
+        classes = classes.filter(x => x !== c);
+        learners = learners.map(l => l.class === c ? {...l, class: ''} : l);
+        for (let t = 1; t <= 3; t++) {
+            if (feesStructure[t]) delete feesStructure[t][c];
+        }
+        saveSchoolData();
+        renderAll();
     }
-  }
+}
 
-  function showFeeReasonsModal() {
+function showFeeReasonsModal() {
     if (!isAuthorized()) return alert('Not authorized');
     renderFeeReasons();
     document.getElementById('feeReasonsModal').classList.remove('hidden');
-  }
+}
 
-  function renderFeeReasons() {
+function renderFeeReasons() {
     const tbody = document.getElementById('feeReasonsList');
     tbody.innerHTML = '';
     feeReasons.forEach((r, i) => {
-      tbody.innerHTML += `<tr><td>\( {r.name}</td><td> \){r.mandatory ? 'Yes' : 'No'}</td><td><button class="btn-sm btn-primary" onclick="editFeeReason(\( {i})">Edit</button> <button class="btn-sm btn-danger" onclick="deleteFeeReason( \){i})">Delete</button></td></tr>`;
+        tbody.innerHTML += `<tr><td>${r.name}</td><td>${r.mandatory ? 'Yes' : 'No'}</td><td><button class="btn-sm btn-primary" onclick="editFeeReason(${i})">Edit</button> <button class="btn-sm btn-danger" onclick="deleteFeeReason(${i})">Delete</button></td></tr>`;
     });
-  }
+}
 
-  function addFeeReason() {
+function addFeeReason() {
     const name = prompt('Fee Reason Name:').trim();
     if (!name) return;
     const mandatory = confirm('Is this fee mandatory?');
     feeReasons.push({name, mandatory});
     saveSchoolData();
     renderFeeReasons();
-  }
+}
 
-  function editFeeReason(i) {
+function editFeeReason(i) {
     const r = feeReasons[i];
     const name = prompt('Fee Reason Name:', r.name).trim();
     if (!name) return;
@@ -1189,66 +1130,66 @@
     feeReasons[i] = {name, mandatory};
     saveSchoolData();
     renderFeeReasons();
-  }
+}
 
-  function deleteFeeReason(i) {
+function deleteFeeReason(i) {
     if (confirm('Delete this fee reason?')) {
-      feeReasons.splice(i, 1);
-      saveSchoolData();
-      renderFeeReasons();
+        feeReasons.splice(i, 1);
+        saveSchoolData();
+        renderFeeReasons();
     }
-  }
+}
 
-  function showFeesModal() {
+function showFeesModal() {
     if (!isAuthorized()) return alert('Not authorized');
     const grid = document.getElementById('feesModalGrid');
     grid.innerHTML = '';
     if (feeReasons.length === 0) {
-      grid.innerHTML = '<p style="text-align:center;color:#999;">No fee reasons defined.</p>';
+        grid.innerHTML = '<p style="text-align:center;color:#999;">No fee reasons defined.</p>';
     } else {
-      classes.sort();
-      classes.forEach(c => {
-        let html = '<div class="fees-group"><h4>' + c + '</h4>';
-        feeReasons.forEach(r => {
-          const safeId = (c + '_' + r.name).replace(/[^a-z0-9]/gi, '_');
-          const amount = feesStructure[currentTerm]?.[c]?.[r.name] ?? 0;
-          html += '<label>' + r.name + ' (' + (r.mandatory ? 'Mandatory' : 'Optional') + ')</label><input type="number" id="' + safeId + '" value="' + amount + '">';
+        classes.sort();
+        classes.forEach(c => {
+            let html = '<div class="fees-group"><h4>' + c + '</h4>';
+            feeReasons.forEach(r => {
+                const safeId = (c + '_' + r.name).replace(/[^a-z0-9]/gi, '_');
+                const amount = feesStructure[currentTerm]?.[c]?.[r.name] ?? 0;
+                html += '<label>' + r.name + ' (' + (r.mandatory ? 'Mandatory' : 'Optional') + ')</label><input type="number" id="' + safeId + '" value="' + amount + '">';
+            });
+            html += '</div>';
+            grid.innerHTML += html;
         });
-        html += '</div>';
-        grid.innerHTML += html;
-      });
     }
     document.getElementById('feesModal').classList.remove('hidden');
-  }
+}
 
-  function saveFeesStructure() {
+function saveFeesStructure() {
     feesStructure[currentTerm] = feesStructure[currentTerm] || {};
     classes.forEach(c => {
-      feesStructure[currentTerm][c] = feesStructure[currentTerm][c] || {};
-      feeReasons.forEach(r => {
-        const safeId = (c + '_' + r.name).replace(/[^a-z0-9]/gi, '_');
-        const input = document.getElementById(safeId);
-        if (input) {
-          const val = parseInt(input.value) || 0;
-          if (val > 0) feesStructure[currentTerm][c][r.name] = val;
-          else delete feesStructure[currentTerm][c][r.name];
-        }
-      });
-      if (Object.keys(feesStructure[currentTerm][c]).length === 0) delete feesStructure[currentTerm][c];
+        feesStructure[currentTerm][c] = feesStructure[currentTerm][c] || {};
+        feeReasons.forEach(r => {
+            const safeId = (c + '_' + r.name).replace(/[^a-z0-9]/gi, '_');
+            const input = document.getElementById(safeId);
+            if (input) {
+                const val = parseInt(input.value) || 0;
+                if (val > 0) feesStructure[currentTerm][c][r.name] = val;
+                else delete feesStructure[currentTerm][c][r.name];
+            }
+        });
+        if (Object.keys(feesStructure[currentTerm][c]).length === 0) delete feesStructure[currentTerm][c];
     });
     saveSchoolData();
     closeModal('feesModal');
     renderFeesSummary();
     renderAll();
-  }
+}
 
-  function showAddSchoolModal() {
+function showAddSchoolModal() {
     if (!isAdmin()) return alert('Only admin can add schools');
     document.getElementById('addSchoolForm').reset();
     document.getElementById('addSchoolModal').classList.remove('hidden');
-  }
+}
 
-  document.getElementById('addSchoolForm').onsubmit = function(e) {
+document.getElementById('addSchoolForm').onsubmit = function(e) {
     e.preventDefault();
     const schoolCode = document.getElementById('schoolCodeInput').value.trim();
     const name = document.getElementById('schoolNameInput').value.trim();
@@ -1265,125 +1206,127 @@
     populateSchoolSelector();
     closeModal('addSchoolModal');
     switchSchool(id);
-  };
+};
 
-  function showAddStaffModal() {
+function showAddStaffModal() {
     if (!isAuthorized()) return alert('Not authorized');
     document.getElementById('staffModalTitle').textContent = 'Add Staff';
     document.getElementById('addStaffForm').reset();
     delete document.getElementById('addStaffForm').dataset.index;
     document.getElementById('addStaffModal').classList.remove('hidden');
-  }
+}
 
-  function editStaff(i) {
+function editStaff(i) {
     if (!isAuthorized()) return alert('Not authorized');
     const s = staff[i];
     document.getElementById('staffModalTitle').textContent = 'Edit Staff';
     document.getElementById('staffRegNo').value = s.regNo;
     document.getElementById('staffName').value = s.name;
-    document.getElementById('staffEmail').value = s.email || '';
+    document.getElementById('staffUsername').value = s.username || '';
     document.getElementById('staffPassword').value = '';
     document.getElementById('staffGender').value = s.gender;
     document.getElementById('staffRole').value = s.role;
     document.getElementById('addStaffForm').dataset.index = i;
     document.getElementById('addStaffModal').classList.remove('hidden');
-  }
+}
 
-  function deleteStaff(i) {
+function deleteStaff(i) {
     if (!isAuthorized()) return alert('Not authorized');
     if (confirm('Delete staff member?')) {
-      staff.splice(i, 1);
-      saveGlobalStaff();
-      renderStaff();
+        const s = staff[i];
+        if (s.username) {
+            let users = JSON.parse(localStorage.getItem('usms_users') || '{}');
+            delete users[s.username];
+            localStorage.setItem('usms_users', JSON.stringify(users));
+        }
+        staff.splice(i, 1);
+        saveGlobalStaff();
+        renderStaff();
     }
-  }
+}
 
-  document.getElementById('addStaffForm').onsubmit = function(e) {
+document.getElementById('addStaffForm').onsubmit = function(e) {
     e.preventDefault();
     const regNo = document.getElementById('staffRegNo').value.trim().toUpperCase();
     const name = document.getElementById('staffName').value.trim();
-    const email = document.getElementById('staffEmail').value.trim().toLowerCase();
+    const username = document.getElementById('staffUsername').value.trim().toLowerCase();
     const password = document.getElementById('staffPassword').value;
     const gender = document.getElementById('staffGender').value;
     const role = document.getElementById('staffRole').value.trim();
-    if (!regNo || !name || !email || !password || !gender || !role) return alert('All fields required');
+    if (!regNo || !name || !username || !password || !gender || !role) return alert('All fields required');
+    let users = JSON.parse(localStorage.getItem('usms_users') || '{}');
     const index = this.dataset.index;
     if (index !== undefined) {
-      staff[index] = {regNo, name, email, gender, role, schoolId: currentSchoolId};
-      alert('Staff updated! Password not changed.');
+        const oldS = staff[index];
+        if (oldS.username && oldS.username !== username) delete users[oldS.username];
+        users[username] = password;
+        staff[index] = {regNo, name, username, gender, role, schoolId: currentSchoolId};
     } else {
-      if (staff.some(s => s.regNo === regNo)) return alert('Code exists');
-      auth.createUserWithEmailAndPassword(email, password)
-        .then(() => {
-          staff.push({regNo, name, email, gender, role, schoolId: currentSchoolId});
-          alert('Staff added and account created!');
-        })
-        .catch((error) => {
-          alert(error.message);
-          return;
-        });
+        if (staff.some(s => s.regNo === regNo)) return alert('Code exists');
+        if (users[username]) return alert('Username exists');
+        users[username] = password;
+        staff.push({regNo, name, username, gender, role, schoolId: currentSchoolId});
     }
+    localStorage.setItem('usms_users', JSON.stringify(users));
     saveGlobalStaff();
     closeModal('addStaffModal');
     renderStaff();
-  };
+};
 
-  function exportStaff() {
-    let csv = 'Code,Name,Email,Gender,Role\n';
+function exportStaff() {
+    let csv = 'Code,Name,Username,Gender,Role\n';
     staff.forEach(s => {
-      csv += `\( {s.regNo}, \){s.name},\( {s.email || ''}, \){s.gender==='M'?'Male':'Female'},${s.role}\n`;
+        csv += `${s.regNo},${s.name},${s.username || ''},${s.gender==='M'?'Male':'Female'},${s.role}\n`;
     });
     const blob = new Blob([csv], {type: 'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'staff.csv'; a.click();
-  }
+}
 
-  function downloadStaffTemplate() {
-    const csv = 'Code,Name,Email,Gender,Role\nST001,Jane Doe,jane@usms.rw,F,Teacher\n';
+function downloadStaffTemplate() {
+    const csv = 'Code,Name,Username,Gender,Role\nST001,Jane Doe,jane,F,Teacher\n';
     const blob = new Blob([csv], {type: 'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'staff_template.csv'; a.click();
-  }
+}
 
-  function importStaff(event) {
+function importStaff(event) {
     if (!isAuthorized()) return alert('Not authorized');
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(e) {
-      const lines = e.target.result.split('\n');
-      let added = 0;
-      for (let i = 1; i < lines.length; i++) {
-        const parts = lines[i].trim().split(',');
-        if (parts.length < 5) continue;
-        const regNo = parts[0].trim().toUpperCase();
-        const name = parts[1].trim();
-        const email = parts[2].trim().toLowerCase();
-        const gender = parts[3].trim().toUpperCase();
-        const role = parts[4].trim();
-        if (regNo && name && email && ['M','F'].includes(gender) && role && !staff.find(s => s.regNo === regNo)) {
-          const password = prompt(`Password for \( {name} ( \){email}):`);
-          if (!password) continue;
-          auth.createUserWithEmailAndPassword(email, password)
-            .then(() => {
-              staff.push({regNo, name, email, gender, role, schoolId: currentSchoolId});
-              added++;
-            })
-            .catch((error) => {
-              alert(`Error for \( {email}: \){error.message}`);
-            });
+        const lines = e.target.result.split('\n');
+        let added = 0;
+        for (let i = 1; i < lines.length; i++) {
+            const parts = lines[i].trim().split(',');
+            if (parts.length < 5) continue;
+            const regNo = parts[0].trim().toUpperCase();
+            const name = parts[1].trim();
+            const username = parts[2].trim().toLowerCase();
+            const gender = parts[3].trim().toUpperCase();
+            const role = parts[4].trim();
+            if (regNo && name && username && ['M','F'].includes(gender) && role && !staff.find(s => s.regNo === regNo)) {
+                let users = JSON.parse(localStorage.getItem('usms_users') || '{}');
+                if (users[username]) continue;
+                const password = prompt(`Password for ${name} (${username}):`);
+                if (!password) continue;
+                users[username] = password;
+                localStorage.setItem('usms_users', JSON.stringify(users));
+                staff.push({regNo, name, username, gender, role, schoolId: currentSchoolId});
+                added++;
+            }
         }
-      }
-      saveGlobalStaff();
-      alert(`Imported ${added} staff`);
-      renderAll();
+        saveGlobalStaff();
+        alert(`Imported ${added} staff`);
+        renderAll();
     };
     reader.readAsText(file);
-  }
+}
 
-  function renderAll() {
+function renderAll() {
     renderDashboard();
     renderLearners();
     renderStaff();
@@ -1392,11 +1335,12 @@
     populateClassFilter();
     populateClassDropdown();
     if (document.getElementById('financeTab').classList.contains('active')) renderFinanceChart();
-  }
+}
 
-  document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     populateSchoolSelector();
-  });
+    setTimeout(() => document.getElementById('loadingScreen').classList.add('hidden'), 1000);
+});
 </script>
 </body>
 </html>
